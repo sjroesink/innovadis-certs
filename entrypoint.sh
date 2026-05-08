@@ -105,7 +105,7 @@ ${rows}
 </table>
 
 <p class="footer">Beheerd door Sander Roesink &middot; auto-renewal via lego (Cloudflare DNS-01) &middot;
-broncode: <a href="https://github.com/S-Roesink_innobv/innovadis-certs">github.com/S-Roesink_innobv/innovadis-certs</a></p>
+broncode: <a href="https://github.com/sjroesink/innovadis-certs">github.com/sjroesink/innovadis-certs</a></p>
 </body>
 </html>
 HTML
