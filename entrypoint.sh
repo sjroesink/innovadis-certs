@@ -52,6 +52,7 @@ publish() {
     rm -f "$WEB_DIR"/*.pfx
     if compgen -G "$cert_dir/*.pfx" > /dev/null; then
         cp "$cert_dir"/*.pfx "$WEB_DIR/"
+        chmod 644 "$WEB_DIR"/*.pfx
     fi
 
     local rows=""
