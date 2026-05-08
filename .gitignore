@@ -1,0 +1,7 @@
+data/
+web/
+*.pfx
+*.crt
+*.key
+*.json
+.lego/
