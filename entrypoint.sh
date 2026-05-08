@@ -45,6 +45,21 @@ issue_or_renew() {
     fi
 }
 
+check_availability() {
+    local fqdn="$1"
+    local subject
+    subject=$(timeout 4 openssl s_client -connect "${fqdn}:443" -servername "${fqdn}" </dev/null 2>/dev/null \
+        | openssl x509 -noout -subject 2>/dev/null \
+        | sed 's/^subject=//')
+    if [[ -z "$subject" ]]; then
+        echo "free"
+    elif [[ "$subject" =~ CN[[:space:]]*=[[:space:]]*${fqdn} ]]; then
+        echo "in_use"
+    else
+        echo "free"
+    fi
+}
+
 publish() {
     local cert_dir="$LEGO_PATH/certificates"
     local out_html="$WEB_DIR/index.html"
@@ -58,7 +73,7 @@ publish() {
     local rows=""
     for pfx in "$WEB_DIR"/*.pfx; do
         [[ -e "$pfx" ]] || continue
-        local name size domain crt enddate
+        local name size domain crt enddate avail badge
         name=$(basename "$pfx")
         size=$(stat -c '%s' "$pfx")
         domain="${name%.pfx}"
@@ -68,7 +83,13 @@ publish() {
         else
             enddate="-"
         fi
-        rows+="<tr><td><a href=\"${name}\">${name}</a></td><td>${size}</td><td>${enddate}</td></tr>"$'\n'
+        avail=$(check_availability "$domain")
+        if [[ "$avail" == "free" ]]; then
+            badge="<span class=\"ok\" title=\"vrij — domein niet geclaimd\">&check;</span>"
+        else
+            badge="<a class=\"in-use\" href=\"https://${domain}\" target=\"_blank\" rel=\"noopener\" title=\"in gebruik — open de tenant\">&cross;</a>"
+        fi
+        rows+="<tr><td><a href=\"${name}\">${name}</a></td><td>${size}</td><td>${enddate}</td><td class=\"avail\">${badge}</td></tr>"$'\n'
     done
 
     cat > "$out_html" <<HTML
@@ -88,18 +109,24 @@ publish() {
   th { color: #555; font-weight: 600; }
   a { color: #0366d6; text-decoration: none; }
   a:hover { text-decoration: underline; }
+  .avail { text-align: center; font-size: 1.2em; line-height: 1; }
+  .avail .ok { color: #2da44e; font-weight: 700; }
+  .avail .in-use { color: #cf222e; font-weight: 700; text-decoration: none; }
+  .avail .in-use:hover { text-decoration: underline; }
   .footer { margin-top: 2em; color: #888; font-size: .85em; }
 </style>
 </head>
 <body>
 <h1>Innovadis tenant test certificates</h1>
 <p class="meta">
-PFX-bestanden voor de pre-made tenant testdomeinen onder <code>innovadis.roes.ink</code>.<br>
-Wachtwoord: <code>${PFX_PASSWORD}</code> &middot; laatst geactualiseerd: $(date -u +%FT%TZ)
+PFX-bestanden voor de pre-made tenant testdomeinen onder <code>innovadis.roes.ink</code>.
+Het wachtwoord staat op de
+<a href="https://innovadis.atlassian.net/wiki/spaces/FOO/pages/5105483777">Confluence-pagina</a>.<br>
+Laatst geactualiseerd: $(date -u +%FT%TZ)
 </p>
 
 <table>
-<thead><tr><th>Bestand</th><th>Bytes</th><th>Geldig tot</th></tr></thead>
+<thead><tr><th>Bestand</th><th>Bytes</th><th>Geldig tot</th><th>Vrij?</th></tr></thead>
 <tbody>
 ${rows}
 </tbody>
