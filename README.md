@@ -17,6 +17,11 @@ It re-checks every `RENEW_INTERVAL_SECONDS` (default 12h). `lego renew`
 no-ops when the cert is still well outside the renewal window, so this is
 cheap to run frequently.
 
+The "Vrij?" (availability) column on the index page is near-live: the page
+fetches `/avail.json`, a CGI endpoint (nginx + fcgiwrap) that probes every
+domain's `:443` in parallel and caches the result for `AVAIL_TTL_SECONDS`
+(default 10s). Checks only run when someone actually requests the endpoint.
+
 State lives in `/data` (mounted on Unraid at
 `/mnt/user/appdata/innovadis-certs/data`):
 
@@ -33,6 +38,7 @@ State lives in `/data` (mounted on Unraid at
 | `DOMAINS` | yes | — | Comma-separated FQDN list |
 | `RENEW_DAYS` | no | 30 | Renew when fewer than N days remain |
 | `RENEW_INTERVAL_SECONDS` | no | 43200 | Sleep between renewal passes |
+| `AVAIL_TTL_SECONDS` | no | 10 | Max age of the `/avail.json` availability cache |
 | `PORT` | no | 8080 | HTTP listen port |
 
 ## Deployment

@@ -1,9 +1,10 @@
 FROM alpine:3.20
 
 ARG TARGETARCH=amd64
+# Pinned: lego v5 changed the CLI (no --accept-tos); entrypoint.sh targets v4.
+ARG LEGO_VERSION=4.35.2
 
-RUN apk add --no-cache ca-certificates curl tini nginx openssl bash jq \
- && LEGO_VERSION=$(curl -fsSL https://api.github.com/repos/go-acme/lego/releases/latest | jq -r .tag_name | sed 's/^v//') \
+RUN apk add --no-cache ca-certificates curl tini nginx openssl bash jq fcgiwrap spawn-fcgi \
  && echo "Installing lego v${LEGO_VERSION} for ${TARGETARCH}" \
  && case "${TARGETARCH}" in \
       amd64) ARCH=amd64 ;; \
@@ -14,12 +15,13 @@ RUN apk add --no-cache ca-certificates curl tini nginx openssl bash jq \
       | tar -xz -C /usr/local/bin lego \
  && chmod +x /usr/local/bin/lego \
  && mkdir -p /data /web /run/nginx \
- && apk del jq \
  && rm -rf /var/cache/apk/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY check-avail.sh /usr/local/bin/check-avail.sh
+COPY avail.cgi /usr/local/bin/avail.cgi
 COPY nginx.conf /etc/nginx/nginx.conf
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/check-avail.sh /usr/local/bin/avail.cgi
 
 ENV LEGO_PATH=/data \
     WEB_DIR=/web \

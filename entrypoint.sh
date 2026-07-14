@@ -45,24 +45,13 @@ issue_or_renew() {
     fi
 }
 
-check_availability() {
-    local fqdn="$1"
-    local subject
-    subject=$(timeout 4 openssl s_client -connect "${fqdn}:443" -servername "${fqdn}" </dev/null 2>/dev/null \
-        | openssl x509 -noout -subject 2>/dev/null \
-        | sed 's/^subject=//')
-    if [[ -z "$subject" ]]; then
-        echo "free"
-    elif [[ "$subject" =~ CN[[:space:]]*=[[:space:]]*${fqdn} ]]; then
-        echo "in_use"
-    else
-        echo "free"
-    fi
-}
-
 publish() {
     local cert_dir="$LEGO_PATH/certificates"
     local out_html="$WEB_DIR/index.html"
+    local avail_json="${AVAIL_CACHE:-/tmp/avail-cache.json}"
+
+    # Prime the shared availability cache (also served by /avail.json).
+    /usr/local/bin/check-avail.sh > "${avail_json}.tmp" && mv "${avail_json}.tmp" "$avail_json"
 
     rm -f "$WEB_DIR"/*.pfx
     if compgen -G "$cert_dir/*.pfx" > /dev/null; then
@@ -83,13 +72,13 @@ publish() {
         else
             enddate="-"
         fi
-        avail=$(check_availability "$domain")
+        avail=$(jq -r --arg d "$domain" '.domains[$d] // "free"' "$avail_json")
         if [[ "$avail" == "free" ]]; then
             badge="<span class=\"ok\" title=\"vrij — domein niet geclaimd\">&check;</span>"
         else
             badge="<a class=\"in-use\" href=\"https://${domain}\" target=\"_blank\" rel=\"noopener\" title=\"in gebruik — open de tenant\">&cross;</a>"
         fi
-        rows+="<tr><td><a href=\"${name}\">${name}</a></td><td>${size}</td><td>${enddate}</td><td class=\"avail\">${badge}</td></tr>"$'\n'
+        rows+="<tr><td><a href=\"${name}\">${name}</a></td><td>${size}</td><td>${enddate}</td><td class=\"avail\" data-domain=\"${domain}\">${badge}</td></tr>"$'\n'
     done
 
     cat > "$out_html" <<HTML
@@ -134,6 +123,30 @@ ${rows}
 
 <p class="footer">Beheerd door Sander Roesink &middot; auto-renewal via lego (Cloudflare DNS-01) &middot;
 broncode: <a href="https://github.com/sjroesink/innovadis-certs">github.com/sjroesink/innovadis-certs</a></p>
+<script>
+(function () {
+  function render(td, status) {
+    var d = td.getAttribute('data-domain');
+    if (status === 'in_use') {
+      td.innerHTML = '<a class="in-use" href="https://' + d + '" target="_blank" rel="noopener" title="in gebruik — open de tenant">&cross;</a>';
+    } else {
+      td.innerHTML = '<span class="ok" title="vrij — domein niet geclaimd">&check;</span>';
+    }
+  }
+  function refresh() {
+    fetch('avail.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || !data.domains) return;
+      var cells = document.querySelectorAll('td.avail[data-domain]');
+      for (var i = 0; i < cells.length; i++) {
+        var s = data.domains[cells[i].getAttribute('data-domain')];
+        if (s) render(cells[i], s);
+      }
+    }).catch(function () {});
+  }
+  refresh();
+  setInterval(refresh, 10000);
+})();
+</script>
 </body>
 </html>
 HTML
@@ -152,12 +165,19 @@ run_all() {
 
 run_all
 
+# Expose the domain list to the /avail.json CGI (fcgiwrap children inherit
+# the environment, but a file survives env-stripping setups).
+printf '%s' "$DOMAINS" > /run/domains
+
+log "starting fcgiwrap on /run/fcgiwrap.sock"
+spawn-fcgi -s /run/fcgiwrap.sock -M 666 -P /run/fcgiwrap.pid -- "$(command -v fcgiwrap)"
+
 log "starting nginx on :${PORT}"
 sed "s/__PORT__/${PORT}/g" /etc/nginx/nginx.conf > /etc/nginx/nginx.conf.tmp
 mv /etc/nginx/nginx.conf.tmp /etc/nginx/nginx.conf
 nginx -g 'daemon off;' &
 NGINX_PID=$!
-trap 'log "shutting down"; kill -TERM "$NGINX_PID" 2>/dev/null || true; exit 0' INT TERM
+trap 'log "shutting down"; kill -TERM "$NGINX_PID" 2>/dev/null || true; kill -TERM "$(cat /run/fcgiwrap.pid 2>/dev/null)" 2>/dev/null || true; exit 0' INT TERM
 
 while true; do
     sleep "$RENEW_INTERVAL_SECONDS"
