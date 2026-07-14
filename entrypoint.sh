@@ -59,13 +59,19 @@ publish() {
         chmod 644 "$WEB_DIR"/*.pfx
     fi
 
+    # Rows follow the order of $DOMAINS (tenant1, tenant1-login, tenant1-shv,
+    # tenant2, ...) instead of the glob's alphabetical order (tenant10 < tenant2).
     local rows=""
-    for pfx in "$WEB_DIR"/*.pfx; do
+    local -a domain_list
+    IFS=',' read -ra domain_list <<< "$DOMAINS"
+    for domain in "${domain_list[@]}"; do
+        domain="${domain// /}"
+        [[ -n "$domain" ]] || continue
+        local pfx="$WEB_DIR/${domain}.pfx"
         [[ -e "$pfx" ]] || continue
-        local name size domain crt enddate avail badge
-        name=$(basename "$pfx")
+        local name size crt enddate avail badge
+        name="${domain}.pfx"
         size=$(stat -c '%s' "$pfx")
-        domain="${name%.pfx}"
         crt="$cert_dir/$domain.crt"
         if [[ -f "$crt" ]]; then
             enddate=$(openssl x509 -in "$crt" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
