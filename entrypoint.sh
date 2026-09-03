@@ -11,6 +11,10 @@ WEB_DIR="${WEB_DIR:-/web}"
 RENEW_DAYS="${RENEW_DAYS:-30}"
 RENEW_INTERVAL_SECONDS="${RENEW_INTERVAL_SECONDS:-43200}"
 PORT="${PORT:-8080}"
+PRIVATE_WILDCARD_DOMAIN="${PRIVATE_WILDCARD_DOMAIN:-}"
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/certificate-lib.sh"
 
 mkdir -p "$LEGO_PATH/certificates" "$WEB_DIR"
 
@@ -165,6 +169,11 @@ run_all() {
         d="${d// /}"
         [[ -n "$d" ]] && issue_or_renew "$d"
     done
+    if [[ -n "$PRIVATE_WILDCARD_DOMAIN" ]]; then
+        log "private wildcard: $PRIVATE_WILDCARD_DOMAIN"
+        issue_private_wildcard "$PRIVATE_WILDCARD_DOMAIN" \
+            || log "ERROR: private wildcard issuance or renewal failed"
+    fi
     publish
     log "published $(ls -1 "$WEB_DIR"/*.pfx 2>/dev/null | wc -l) pfx files"
 }

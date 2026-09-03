@@ -36,10 +36,17 @@ State lives in `/data` (mounted on Unraid at
 | `PFX_PASSWORD` | yes | — | Password protecting the exported PFX files |
 | `CONTACT_EMAIL` | yes | — | ACME account contact email |
 | `DOMAINS` | yes | — | Comma-separated FQDN list |
+| `PRIVATE_WILDCARD_DOMAIN` | no | — | Wildcard FQDN to issue with its apex as SAN, stored privately under `/data/private` and never published |
 | `RENEW_DAYS` | no | 30 | Renew when fewer than N days remain |
 | `RENEW_INTERVAL_SECONDS` | no | 43200 | Sleep between renewal passes |
 | `AVAIL_TTL_SECONDS` | no | 10 | Max age of the `/avail.json` availability cache |
 | `PORT` | no | 8080 | HTTP listen port |
+
+Private wildcard certificates use the same Cloudflare DNS-01 flow and renewal
+interval, but are deliberately excluded from the public index. For example,
+`PRIVATE_WILDCARD_DOMAIN=*.innovadis.sander.ninja` produces a PFX containing
+both `*.innovadis.sander.ninja` and `innovadis.sander.ninja` under
+`/data/private/certificates/_.innovadis.sander.ninja.pfx` with mode `0600`.
 
 ## Deployment
 

@@ -18,10 +18,11 @@ RUN apk add --no-cache ca-certificates curl tini nginx openssl bash jq fcgiwrap 
  && rm -rf /var/cache/apk/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY certificate-lib.sh /usr/local/bin/certificate-lib.sh
 COPY check-avail.sh /usr/local/bin/check-avail.sh
 COPY avail.cgi /usr/local/bin/avail.cgi
 COPY nginx.conf /etc/nginx/nginx.conf
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/check-avail.sh /usr/local/bin/avail.cgi
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/certificate-lib.sh /usr/local/bin/check-avail.sh /usr/local/bin/avail.cgi
 
 ENV LEGO_PATH=/data \
     WEB_DIR=/web \
